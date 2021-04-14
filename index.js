@@ -3,24 +3,12 @@ const morgan = require('morgan');
 const cors = require('cors');
 
 morgan.token('body',(req,rsp) => JSON.stringify(req.body))
-/**
- * 对未知页面处理
- * @param {*} req 
- * @param {*} rsp 
- */
- const unknownEndpoint = (req,rsp,next) => {
-    if(!req.path.startsWith('/api/persons')) {
-        return rsp.status(404).send({error: 'uknown error.'});
-    }
-    next();
-}
 
 const app = express();
 app.use(cors());
 app.use(express.static('build'))
 app.use(express.json());
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :body'));
-app.use(unknownEndpoint);
 
 let persons =  [
     {
