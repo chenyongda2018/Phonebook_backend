@@ -23,7 +23,7 @@ const errorHandler = (error, req, rsp, next) => {
     if (error.name === 'CastError' && error.kind === 'ObjectId') {
         return rsp.status(400).send({ error: 'malformatted id' })
     }
-    if (error.name === 'ValidationError') {
+    if (error.name === 'ValidationError' ) {
         return rsp.status(400).json({ error: error.message });
     }
     next(error)

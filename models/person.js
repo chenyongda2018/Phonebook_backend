@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const uniqueValidator = require('mongoose-unique-validator');
 
 const url = process.env.MONGO_URI;
 
@@ -18,15 +19,18 @@ mongoose.connect(url, {
 const personSchema = new mongoose.Schema({
     name: {
         type: String,
+        unique: true,
         minLength: 3,
-        required: true
+        required: true,
     },
     number: {
         type: String,
+        unique: true,
         minLength: 5,
         required: true
     }
 });
+personSchema.plugin(uniqueValidator);
 //格式化mongoose返回的对象
 personSchema.set('toJSON',{
     transform:(document,returnedObject) => {
