@@ -23,12 +23,10 @@ const errorHandler = (error, req, rsp, next) => {
     if (error.name === 'CastError' && error.kind === 'ObjectId') {
         return rsp.status(400).send({ error: 'malformatted id' })
     }
+    if (error.name === 'ValidationError') {
+        return rsp.status(400).json({ error: error.message });
+    }
     next(error)
-}
-
-const ipLog = (req,rsp,next) => {
-    console.log('ip:',req.ip)
-    next();
 }
 
 const app = express();
@@ -36,7 +34,6 @@ app.use(cors());
 app.use(express.static('build'))
 app.use(express.json());
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :body'));
-app.use(ipLog);
 app.use(unknownEndpoint);
 
 /**
@@ -85,7 +82,7 @@ app.get('/api/persons/:id', (req, rsp, next) => {
 /**
  * 创建新的记录
  */
-app.post('/api/persons', (req, rsp) => {
+app.post('/api/persons', (req, rsp, next) => {
     const body = req.body;
     if (!body.name) {
         return rsp.status(400).json({ error: 'Name must not be empty' });
@@ -97,9 +94,11 @@ app.post('/api/persons', (req, rsp) => {
         name: body.name,
         number: body.number
     })
-    person.save().then(result => {
-        rsp.json(person);
-    })
+    person.save()
+        .then(result => {
+            rsp.json(person);
+        })
+        .catch(error => { next(error) })
 })
 
 app.put('/api/persons/:id', (req, rsp, next) => {

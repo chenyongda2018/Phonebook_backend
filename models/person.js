@@ -16,8 +16,16 @@ mongoose.connect(url, {
 });
 
 const personSchema = new mongoose.Schema({
-    name: String,
-    number: String
+    name: {
+        type: String,
+        minLength: 3,
+        required: true
+    },
+    number: {
+        type: String,
+        minLength: 5,
+        required: true
+    }
 });
 //格式化mongoose返回的对象
 personSchema.set('toJSON',{
