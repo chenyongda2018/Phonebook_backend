@@ -1,114 +1,133 @@
+require('dotenv').config()
 const express = require('express');
 const morgan = require('morgan');
 const cors = require('cors');
+const Person = require('./models/person')
 
-morgan.token('body',(req,rsp) => JSON.stringify(req.body))
+morgan.token('body', (req, rsp) => JSON.stringify(req.body))
+/**
+ * 对未知页面处理
+ * @param {*} req 
+ * @param {*} rsp 
+ */
+const unknownEndpoint = (req, rsp, next) => {
+    console.log('path: ', req.path);
+    if (!req.path.startsWith('/api/')) {
+        return rsp.status(404).send({ error: 'uknown error.' });
+    }
+    next();
+}
+
+const errorHandler = (error, req, rsp, next) => {
+    console.error(error);
+    if (error.name === 'CastError' && error.kind === 'ObjectId') {
+        return rsp.status(400).send({ error: 'malformatted id' })
+    }
+    next(error)
+}
 
 const app = express();
 app.use(cors());
 app.use(express.static('build'))
 app.use(express.json());
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :body'));
-
-let persons =  [
-    {
-        "name": "lei jun",
-        "number": "2189392183",
-        "id": 1
-      },
-      {
-        "name": "Tony chen",
-        "number": "123123",
-        "id": 2
-      },
-      {
-        "name": "xiao hong",
-        "number": "123123",
-        "id": 3
-      },
-      {
-        "name": "xiao gang",
-        "number": "123123",
-        "id": 4
-      }
-  ]
+app.use(unknownEndpoint);
 
 /**
  * 获取所有联系人
  */
-app.get('/api/persons',(req,rsp)=>{
-    if(!persons) {
-        return rsp.status(400).json({error:'There is no any data.'})
-    }
-
-    return rsp.status(200).json(persons);
+app.get('/api/persons', (req, rsp) => {
+    Person.find({}).then(result => {
+        if (!result) {
+            return rsp.status(400).json({ error: 'There is no any data.' })
+        }
+        return rsp.status(200).json(result);
+    })
 })
 
 /**
  * 获取总体描述
  */
-app.get('/api/infos',(req,rsp) => {
+app.get('/api/infos', (req, rsp) => {
     const curTime = new Date();
-    rsp.send(
-        `Phonebook has info for ${persons.length} people.<br/>
-        ${curTime}`
-    )
+    Person.find({}).then(result => {
+        console.log('person infos:', result);
+        rsp.send(
+            `Phonebook has info for ${result.length} people.<br/>
+            ${curTime}`
+        )
+    })
 })
 
 /**
  * 根据id查询
  */
-app.get('/api/persons/:id',(req,rsp) => {
-    const id = Number(req.params.id);
-    console.log('get person info id: ',id);
-    const person = persons.find(p => p.id === id);
-    if(person) {
-        return rsp.status(200).json(person);
-    }
-    return rsp.status(400).json({error:`Can't find the person info that id=${id}`})
+app.get('/api/persons/:id', (req, rsp, next) => {
+    console.log('get person id: ', req.params.id);
+    Person
+        .findById(req.params.id)
+        .then(person => {
+            if (person) {
+                rsp.json(person)
+            } else {
+                rsp.status(404).end()
+            }
+        })
+        .catch(error => next(error))
 })
 
 /**
  * 创建新的记录
  */
-app.post('/api/persons',(req,rsp) => {
+app.post('/api/persons', (req, rsp) => {
     const body = req.body;
-    if(!body.name) {
-        return rsp.status(400).json({error:'Name must not be empty'});
+    if (!body.name) {
+        return rsp.status(400).json({ error: 'Name must not be empty' });
     }
-    if(!body.number) {
-        return rsp.status(400).json({error:'Number must not be empty'});
+    if (!body.number) {
+        return rsp.status(400).json({ error: 'Number must not be empty' });
     }
-    const isExist = persons.find(p => p.name === body.name);
-    if(isExist) {
-        return rsp.status(400).json({error:'Name must be unique'});
-    }
-    const person = {
+    const person = new Person({
         name: body.name,
-        number: body.number,
-        id: generateId()
-    }
-    persons = persons.concat(person);
-    rsp.status(200).json(person);
+        number: body.number
+    })
+    person.save().then(result => {
+        rsp.json(person);
+    })
 })
 
-app.delete('/api/persons/:id',(req,rsp) => {
-    const id = Number(req.params.id);
-    const person = persons.find( p => p.id === id);
-    if(person) {
-        persons = persons.filter( p => p.id !== id);
-        return rsp.status(200).end();
+app.put('/api/persons/:id', (req, rsp, next) => {
+    const person = {
+        name: req.body.name,
+        number: req.body.number
     }
-    return rsp.status(400).json({error: `the person dont't exist in server`});
+    //new:true 决定返回新对象还是旧对象
+    Person
+        .findByIdAndUpdate(req.params.id, person, { new: true })
+        .then(updatePerson => {
+            if (updatePerson) {
+                rsp.json(updatePerson)
+            } else {
+                rsp.status(404).end()
+            }
+        })
+        .catch(error => next(error))
 })
 
-const generateId = () => {
-    return persons.length > 0 
-        ? Math.max(...persons.map(p => p.id)) + 1 : 0;
-}
+app.delete('/api/persons/:id', (req, rsp) => {
+    Person
+        .findByIdAndRemove(req.params.id)
+        .then(result => {
+            return rsp.status(204).end();
+        })
+        .catch(error => {
+            next(error)
+        })
+})
 
+app.use(errorHandler);
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT,()=> {
-    console.log('Server is listenning port:'+PORT);
+const PORT = 3001;
+app.listen(PORT, () => {
+    console.log('Server is listenning port:' + PORT);
 })
