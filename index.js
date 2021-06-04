@@ -19,11 +19,11 @@ mongoose.connect(config.MONGO_URI, {
     logger.error('Error connect to MongoDB',error.message)
 })
 
-app.use('/api/persons',personsRouter)
 app.use(cors())
 app.use(express.static('build'))
 app.use(express.json())
 app.use(middleWare.requestLogger)
+app.use('/api/persons',personsRouter)
 app.use(middleWare.unknownEndpoint)
 app.use(middleWare.errorHandler)
 
